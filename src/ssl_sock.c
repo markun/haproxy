@@ -2302,6 +2302,17 @@ static int ssl_sock_switchctx_err_cbk(SSL *ssl, int *al, void *priv)
 }
 
 #ifdef OPENSSL_IS_BORINGSSL
+int SSL_CIPHER_cmp(const SSL_CIPHER **a, const SSL_CIPHER **b)
+#else
+int SSL_CIPHER_cmp(const SSL_CIPHER *const *a, const SSL_CIPHER *const *b)
+#endif
+{
+	const uint32_t id_a = SSL_CIPHER_get_id(*a);
+	const uint32_t id_b = SSL_CIPHER_get_id(*b);
+	return memcmp(&id_a, &id_b, 4);
+}
+
+#ifdef OPENSSL_IS_BORINGSSL
 static int ssl_sock_switchctx_cbk(const struct ssl_early_callback_ctx *ctx)
 {
 	SSL *ssl = ctx->ssl;
@@ -2427,6 +2438,8 @@ static int ssl_sock_switchctx_cbk(SSL *ssl, int *al, void *arg)
 		len = SSL_client_hello_get0_ciphers(ssl, &client_cipher_ids);
 #endif
 		server_ciphers = SSL_get_ciphers(ssl);
+		sk_SSL_CIPHER_set_cmp_func(server_ciphers, SSL_CIPHER_cmp);
+		sk_SSL_CIPHER_sort(server_ciphers);
 
 		if (len % 2 != 0)
 			goto abort;
